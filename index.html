@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Money</title>
+  <meta name="theme-color" content="#14304d">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Money">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="icon-180.png">
+  <link rel="icon" href="icon-192.png">
+  <style>
+    :root {
+      --navy:#14304d; --navy2:#1c4369; --amber:#f5a623; --blue:#1c4a73;
+      --bg:#f2f4f7; --card:#fff; --line:#d6dbe3; --text:#1d2433; --muted:#5b6475;
+      --exp:#b54728; --inc:#1e7e43; --tra:#1c4a73; --adj:#7a4fb5; --err:#b42318;
+      --accent:var(--exp);
+      --top:env(safe-area-inset-top, 0px); --bottom:env(safe-area-inset-bottom, 0px);
+    }
+    * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+    html, body { margin:0; background:var(--bg); color:var(--text); overflow-x:hidden; }
+    body { font-family:-apple-system, BlinkMacSystemFont, "SF Pro Text", Roboto, Arial, sans-serif; font-size:16px; }
+    main { max-width:520px; margin:0 auto; padding:0 16px calc(104px + var(--bottom)); }
+    .hide { display:none !important; }
+
+    /* Sticky navy header: runs up under the iPhone status bar */
+    .head { position:sticky; top:0; z-index:5; color:#fff;
+            background:linear-gradient(180deg, var(--navy) 0%, var(--navy2) 100%);
+            width:100vw; margin-left:calc(50% - 50vw); margin-right:calc(50% - 50vw);
+            padding:calc(var(--top) + 12px) max(16px, calc(50vw - 260px)) 12px;
+            box-shadow:0 2px 8px rgba(20,48,77,.25); }
+    .head h1 { margin:0; font-size:21px; font-weight:700; padding-right:110px; }
+    .head + * { margin-top:14px; }
+    .head .back, .head .switch button { background:rgba(255,255,255,.14); border:1px solid rgba(255,255,255,.28); color:#fff;
+            border-radius:10px; min-height:40px; font-size:15px; font-weight:600; padding:0 14px; cursor:pointer; }
+    .head .back { margin-bottom:8px; }
+    .switch { display:flex; align-items:center; gap:8px; padding-right:96px; }
+    .switch h1 { flex:1; text-align:center; padding-right:0; }
+    .switch button { min-width:44px; font-size:22px !important; padding:0 !important; }
+    .switch button:disabled { opacity:.35; }
+
+    /* Sync status pill, top right */
+    #sync { position:fixed; z-index:6; top:calc(var(--top) + 14px); right:max(12px, calc(50vw - 256px));
+            border:0; border-radius:14px; padding:5px 10px; font-size:12px; font-weight:700; cursor:pointer;
+            background:rgba(255,255,255,.16); color:#fff; display:flex; align-items:center; gap:6px; }
+    #sync .dot { width:8px; height:8px; border-radius:50%; background:#4ade80; }
+    #sync.syncing .dot { background:var(--amber); animation:pulse 1s infinite; }
+    #sync.offline .dot { background:#cbd5e1; }
+    #sync.error .dot { background:#f87171; }
+    @keyframes pulse { 50% { opacity:.3; } }
+
+    /* Type tabs (Expense / Income / Transfer) */
+    .tabs { display:flex; background:rgba(255,255,255,.14); border-radius:12px; padding:4px; gap:4px; margin-top:10px; }
+    .tabs button { flex:1; border:0; background:transparent; padding:10px 4px; font-size:15px; font-weight:600;
+                   color:rgba(255,255,255,.85); border-radius:9px; cursor:pointer; }
+    .tabs button.on { background:#fff; color:var(--accent); }
+
+    label { display:block; font-size:13px; color:var(--muted); margin:14px 0 5px; }
+    input, select, textarea { display:block; width:100%; min-width:0; padding:11px 12px; font-size:16px; min-height:46px;
+                    border:1px solid var(--line); border-radius:10px; background:#fff; color:var(--text); font-family:inherit; }
+    input { -webkit-appearance:none; appearance:none; }
+    textarea { min-height:90px; resize:vertical; }
+    .money { position:relative; }
+    .money input { font-size:26px; font-weight:700; min-height:58px; padding-right:70px; }
+    .money .cur { position:absolute; right:14px; top:50%; transform:translateY(-50%); font-size:15px; font-weight:700; color:var(--muted); }
+    .hint { font-size:12px; color:var(--muted); margin-top:5px; }
+    .info { font-size:13px; color:var(--muted); min-height:18px; margin-top:10px; }
+    .sub { font-size:13px; color:var(--muted); }
+
+    .save { margin-top:22px; width:100%; padding:15px; font-size:17px; font-weight:700; border:0; border-radius:12px;
+            background:var(--accent); color:#fff; cursor:pointer; }
+    .save:disabled { opacity:.5; }
+    .btn2 { border:1px solid var(--line); background:#fff; color:var(--blue); border-radius:10px; min-height:46px;
+            padding:0 16px; font-size:15px; font-weight:600; cursor:pointer; white-space:nowrap; }
+    .btn2.wide { width:100%; margin-top:10px; }
+    .btn2.danger { width:100%; margin-top:12px; color:var(--err); }
+    .btn2.danger.armed, .chip.armed { background:#fde8e6; border-color:#f3b4ad; color:var(--err); }
+    .addRow { display:flex; gap:8px; margin-top:10px; }
+    .addRow input, .addRow select { flex:1; }
+    .msg { margin-top:14px; padding:12px; border-radius:10px; display:none; font-size:15px; }
+    .msg.ok { display:block; background:#e3f4ea; color:var(--inc); }
+    .msg.err { display:block; background:#fde8e6; color:var(--err); }
+
+    h2 { font-size:13px; margin:24px 0 8px; color:var(--muted); font-weight:700; text-transform:uppercase; letter-spacing:.04em; }
+    .card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:14px; }
+    .bigNum { font-size:30px; font-weight:800; font-variant-numeric:tabular-nums; }
+    .totals { display:grid; grid-template-columns:repeat(auto-fit, minmax(140px, 1fr)); gap:10px; margin-top:12px; }
+    .totals .label { font-size:12px; color:var(--muted); font-weight:700; }
+    .totals .val { font-size:20px; font-weight:800; margin-top:4px; font-variant-numeric:tabular-nums; }
+    .totals.loans .card { background:#eceff4; }
+    .kv { display:flex; justify-content:space-between; gap:10px; font-size:14px; margin-top:6px; font-variant-numeric:tabular-nums; }
+    .neg { color:var(--err); } .pos { color:var(--inc); } .tra { color:var(--tra); } .adj { color:var(--adj); }
+
+    .row { display:flex; align-items:center; justify-content:space-between; gap:10px; width:100%; text-align:left;
+           background:#fff; border:1px solid var(--line); border-radius:12px; padding:12px; margin-top:8px;
+           font:inherit; color:inherit; cursor:pointer; }
+    .row .l { min-width:0; } .row .r { text-align:right; white-space:nowrap; font-variant-numeric:tabular-nums; }
+    .row .name { font-weight:600; font-size:15px; }
+    .row .amt { font-weight:700; font-size:15px; }
+    .row .chev { color:var(--muted); font-size:20px; margin-left:4px; }
+
+    .list .tx { display:flex; justify-content:space-between; gap:10px; padding:11px 4px; border-bottom:1px solid #e3e7ee; cursor:pointer; }
+    .list .tx:active { background:#e9edf3; }
+    .list .tx:last-child { border-bottom:0; }
+    .tx .l { min-width:0; } .tx .t { font-size:15px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .tx .r { text-align:right; white-space:nowrap; font-weight:700; font-size:15px; font-variant-numeric:tabular-nums; }
+    .pend { color:var(--amber); font-weight:700; }
+    .empty { color:var(--muted); font-size:14px; padding:10px 2px; }
+
+    .bar { height:8px; border-radius:4px; background:#e3e7ee; margin-top:5px; overflow:hidden; }
+    .bar span { display:block; height:100%; border-radius:4px; background:var(--exp); }
+    .bar.who span { background:var(--blue); }
+    .bar.warn span { background:var(--amber); }
+    .bar.over span { background:var(--err); }
+    .cat { margin-top:10px; }
+    .cat .top { display:flex; justify-content:space-between; gap:10px; font-size:14px; font-variant-numeric:tabular-nums; }
+    .curTag { font-size:12px; font-weight:700; color:var(--muted); margin-top:14px; }
+    .inc { font-size:12px; color:var(--inc); margin-top:3px; }
+
+    .filter { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:6px; }
+    .filter button { border:1px solid var(--line); background:#fff; color:var(--muted); border-radius:16px; padding:6px 14px;
+                     font-size:14px; font-weight:600; cursor:pointer; min-height:34px; }
+    .filter button.on { background:var(--navy); border-color:var(--navy); color:#fff; }
+
+    .chips { display:flex; flex-wrap:wrap; gap:8px; }
+    .chip { display:inline-flex; align-items:center; gap:2px; background:#fff; border:1px solid var(--line); border-radius:18px;
+            padding:4px 4px 4px 12px; font-size:14px; }
+    .chip.locked { padding:7px 12px; background:#f7f8fa; }
+    .chip button { border:0; background:none; color:var(--muted); font-size:18px; line-height:1; width:30px; height:30px; cursor:pointer; border-radius:50%; }
+    .chip.armed button { color:var(--err); font-size:13px; font-weight:700; width:auto; padding:0 8px; }
+    .code { font-family:ui-monospace, Menlo, monospace; font-size:13px; background:#eef1f5; border-radius:8px; padding:8px 10px; word-break:break-all; }
+
+    /* Bottom bar */
+    .bottombar { position:fixed; left:0; right:0; bottom:0; z-index:10; display:flex; background:var(--navy);
+                 box-shadow:0 -2px 10px rgba(20,48,77,.25); padding:6px 4px calc(6px + var(--bottom)); }
+    .bottombar button, .bottombar .fab { flex:1; display:flex; flex-direction:column; align-items:center; gap:3px; border:0;
+                 background:none; padding:6px 0; font-size:11px; font-weight:600; color:rgba(255,255,255,.62); cursor:pointer;
+                 font-family:inherit; margin:0; }
+    .bottombar svg { width:24px; height:24px; fill:none; stroke:currentColor; stroke-width:1.9; stroke-linecap:round; stroke-linejoin:round; }
+    .bottombar button.on { color:var(--amber); }
+    .bottombar .fab { color:var(--amber); justify-content:flex-end; }
+    .fabCircle { width:62px; height:62px; margin-top:-30px; border-radius:50%; background:var(--amber); color:var(--navy);
+                 display:flex; align-items:center; justify-content:center; border:4px solid var(--navy);
+                 box-shadow:0 4px 14px rgba(245,166,35,.45); }
+    .fabCircle svg { width:30px; height:30px; stroke-width:2.1; }
+    .fab:active .fabCircle { transform:scale(.95); }
+
+    /* Live QR scanner */
+    #live { position:fixed; inset:0; z-index:30; background:#000; display:flex; flex-direction:column; }
+    #live video { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
+    #live .frame { position:absolute; left:50%; top:45%; width:70vmin; height:70vmin; transform:translate(-50%, -50%);
+                   border:3px solid var(--amber); border-radius:18px; box-shadow:0 0 0 100vmax rgba(0,0,0,.45); }
+    #live .top { position:relative; color:#fff; text-align:center; padding:calc(var(--top) + 18px) 20px 0; font-size:16px; font-weight:600; }
+    #live .bottom { position:absolute; left:0; right:0; bottom:0; padding:16px 16px calc(16px + var(--bottom)); display:flex; gap:10px; }
+    #live .bottom > * { flex:1; text-align:center; border:0; border-radius:12px; padding:15px; font-size:16px; font-weight:700; cursor:pointer; }
+    #livePhoto { background:rgba(255,255,255,.18); color:#fff; }
+    #liveCancel { background:#fff; color:var(--text); }
+    #liveErr { position:relative; color:#fff; text-align:center; margin:30vh 24px 0; font-size:15px; }
+    input[type=file] { display:none; }
+
+    #busy { position:fixed; inset:0; z-index:40; display:flex; flex-direction:column; align-items:center; justify-content:center;
+            gap:14px; background:rgba(242,244,247,.82); }
+    .spinner { width:42px; height:42px; border-radius:50%; border:4px solid #d0d5dd; border-top-color:var(--amber); animation:spin .8s linear infinite; }
+    #busyText { font-size:15px; font-weight:600; text-align:center; padding:0 24px; }
+    @keyframes spin { to { transform:rotate(360deg); } }
+    #toast { position:fixed; left:16px; right:16px; bottom:calc(92px + var(--bottom)); z-index:20; max-width:488px; margin:0 auto;
+             background:#1f2937; color:#fff; border-radius:12px; padding:12px 14px; font-size:14px;
+             box-shadow:0 6px 20px rgba(0,0,0,.25); transition:opacity .2s; }
+    #toast.err { background:#9b1c1c; }
+  </style>
+</head>
+<body>
+  <button id="sync" type="button" class="hide"><span class="dot"></span><span id="syncText">Synced</span></button>
+
+  <main>
+  <!-- First start: connect this phone to the Google Sheet -->
+  <section id="viewConnect" class="hide">
+    <div class="head"><h1>Connect Money</h1></div>
+    <p class="sub">Paste the connection code for this phone. It was shown in Apps Script when you ran <b>setupApp</b>. Each person has their own code.</p>
+    <label for="connCode">Connection code</label>
+    <textarea id="connCode" autocomplete="off" autocapitalize="off" spellcheck="false"></textarea>
+    <div class="addRow">
+      <button type="button" class="btn2" id="connPaste">Paste</button>
+      <button type="button" class="save" id="connGo" style="margin:0;background:var(--blue)">Connect</button>
+    </div>
+    <div class="msg" id="connMsg"></div>
+  </section>
+
+  <!-- Add / edit an entry -->
+  <section id="viewAdd" class="hide">
+    <div class="head">
+      <h1 id="addTitle">Add</h1>
+      <div class="tabs" id="tabs">
+        <button type="button" data-type="Expense" class="on">Expense</button>
+        <button type="button" data-type="Income">Income</button>
+        <button type="button" data-type="Transfer">Transfer</button>
+      </div>
+    </div>
+    <div id="scanBlock">
+      <label for="link">Invoice link <span class="sub">(tap Scan below, or paste a link)</span></label>
+      <input id="link" placeholder="https://efiskalizimi-app.tatime.gov.al/..." autocomplete="off">
+    </div>
+    <div class="info" id="info"></div>
+
+    <label id="accountLabel" for="account">Paid from</label>
+    <select id="account"></select>
+    <div id="toBlock" class="hide">
+      <label for="toAccount">To</label>
+      <select id="toAccount"></select>
+    </div>
+
+    <label for="amount">Amount</label>
+    <div class="money"><input id="amount" type="text" inputmode="decimal" placeholder="0.00" autocomplete="off"><span class="cur" id="cur"></span></div>
+    <div class="hint" id="amountHint"></div>
+    <button type="button" class="btn2 hide" id="amtSign" style="margin-top:8px">+/− (make the correction negative or positive)</button>
+
+    <div id="receivedBlock" class="hide">
+      <label for="received">Amount received</label>
+      <div class="money"><input id="received" type="text" inputmode="decimal" placeholder="0.00" autocomplete="off"><span class="cur" id="cur2"></span></div>
+      <div class="hint">The accounts use different currencies: enter what arrived in the "To" account.</div>
+    </div>
+
+    <label for="date">Date</label>
+    <input id="date" type="date">
+    <div id="categoryBlock">
+      <label for="category">Category</label>
+      <select id="category"></select>
+    </div>
+    <label id="descLabel" for="description">Seller / description</label>
+    <input id="description" autocomplete="off">
+    <label for="who">Who</label>
+    <select id="who"></select>
+
+    <button type="button" class="save" id="save">Save expense</button>
+    <div id="editBar" class="hide">
+      <button type="button" class="btn2 wide" id="editCancel">Cancel</button>
+      <button type="button" class="btn2 danger" id="editDelete">Delete entry</button>
+    </div>
+    <div class="msg" id="msg"></div>
+  </section>
+
+  <section id="viewAccounts" class="hide">
+    <div class="head"><h1>Accounts</h1></div>
+    <div class="sub" id="accSub"></div>
+    <div class="totals" id="accTotals"></div>
+    <div class="totals loans" id="accTotalsLoans"></div>
+    <div id="accGroups"></div>
+  </section>
+
+  <section id="viewAccount" class="hide">
+    <div class="head">
+      <button class="back" id="accBack" type="button">‹ Accounts</button>
+      <h1 id="adName"></h1>
+    </div>
+    <div class="card">
+      <div class="bigNum" id="adBalance"></div>
+      <div class="sub" id="adLine"></div>
+    </div>
+    <button type="button" class="btn2 wide" id="adFix">Correct balance</button>
+    <div class="card hide" id="adFixBox" style="margin-top:10px">
+      <div class="sub">Type what the bank or wallet really shows. The difference is saved as a balance correction (not counted as income or expense).</div>
+      <label for="adActual">Actual balance</label>
+      <div class="addRow" style="margin-top:0">
+        <input id="adActual" type="text" inputmode="decimal" autocomplete="off">
+        <button type="button" class="btn2" id="adSign" aria-label="Make negative or positive">+/−</button>
+      </div>
+      <label for="adDate">Date of the correction</label>
+      <input id="adDate" type="date">
+      <div class="hint" id="adDiff"></div>
+      <button type="button" class="save" id="adSave" style="background:var(--blue)">Save correction</button>
+    </div>
+    <h2 id="adListTitle">Transactions</h2>
+    <div class="list" id="adList"></div>
+  </section>
+
+  <section id="viewMonth" class="hide">
+    <div class="head">
+      <div class="switch">
+        <button type="button" id="mPrev" aria-label="Previous month">‹</button>
+        <h1 id="mTitle">Month</h1>
+        <button type="button" id="mNext" aria-label="Next month">›</button>
+      </div>
+    </div>
+    <div class="totals" id="mTotals"></div>
+    <h2>Expenses by category</h2>
+    <div id="mCats"></div>
+    <h2>By person</h2>
+    <div id="mWho"></div>
+    <h2>Transactions</h2>
+    <div class="filter" id="mFilter"></div>
+    <div class="list" id="mList"></div>
+  </section>
+
+  <section id="viewSettings" class="hide">
+    <div class="head"><h1>Settings</h1></div>
+    <div class="sub" id="setMe"></div>
+    <button type="button" class="btn2 wide" id="setSyncNow">Sync now</button>
+    <div class="msg" id="setMsg"></div>
+
+    <h2>Accounts</h2>
+    <div id="setAccounts"></div>
+    <button type="button" class="btn2 wide" id="setAddAcc">+ Add account</button>
+
+    <h2>Monthly budgets (ALL)</h2>
+    <div id="setBudgets"></div>
+    <div class="addRow"><select id="budCat"></select><input id="budAmt" type="text" inputmode="decimal" placeholder="Amount" style="max-width:120px"><button type="button" class="btn2" id="budSet">Set</button></div>
+    <div class="hint">You get a notification at 80% and at 100% of a budget.</div>
+
+    <h2>Expense categories</h2>
+    <div class="chips" id="setCatExp"></div>
+    <div class="addRow"><input id="newCatExp" placeholder="New expense category" autocomplete="off"><button type="button" class="btn2" id="addCatExp">Add</button></div>
+
+    <h2>Income categories</h2>
+    <div class="chips" id="setCatInc"></div>
+    <div class="addRow"><input id="newCatInc" placeholder="New income category" autocomplete="off"><button type="button" class="btn2" id="addCatInc">Add</button></div>
+
+    <h2>Currencies</h2>
+    <div class="chips" id="setCur"></div>
+    <div class="addRow"><input id="newCur" placeholder="e.g. USD" maxlength="3" autocomplete="off" style="text-transform:uppercase"><button type="button" class="btn2" id="addCur">Add</button></div>
+    <div class="hint">Items without × are in use and can't be deleted.</div>
+
+    <h2>My NIPT</h2>
+    <div class="sub">Invoices with this NIPT are yours and are saved as Income when scanned. Separate several with commas.</div>
+    <div class="addRow"><input id="setNipt" autocomplete="off" style="text-transform:uppercase"><button type="button" class="btn2" id="saveNipt">Save</button></div>
+
+    <h2>Notifications</h2>
+    <div class="card">
+      <div class="sub">In the <b>ntfy</b> app, tap <b>+</b>, enter this topic and tap <b>Subscribe</b>. Keep it private: it works like a password.</div>
+      <div class="code" id="ntfyTopic" style="margin-top:10px"></div>
+      <button type="button" class="btn2 wide" id="ntfyCopy">Copy topic</button>
+      <label for="remHour">Daily reminder (only if you logged nothing that day)</label>
+      <div class="addRow" style="margin-top:0"><select id="remHour"></select><button type="button" class="btn2" id="remSave">Save</button></div>
+    </div>
+
+    <h2>This phone</h2>
+    <button type="button" class="btn2 danger" id="disconnect">Disconnect this phone</button>
+  </section>
+
+  <section id="viewAccountEdit" class="hide">
+    <div class="head">
+      <button class="back" id="aeBack" type="button">‹ Settings</button>
+      <h1 id="aeTitle">Account</h1>
+    </div>
+    <label for="aeName">Name</label>
+    <input id="aeName" autocomplete="off">
+    <label for="aeOwner">Owner</label>
+    <select id="aeOwner"></select>
+    <label for="aeType">Type</label>
+    <select id="aeType"></select>
+    <label for="aeCur">Currency</label>
+    <select id="aeCur"></select>
+    <label for="aeOpening">Opening balance</label>
+    <div class="addRow" style="margin-top:0">
+      <input id="aeOpening" type="text" inputmode="decimal" placeholder="0.00" autocomplete="off">
+      <button type="button" class="btn2" id="aeSign" aria-label="Make negative or positive">+/−</button>
+    </div>
+    <div class="hint">Balance at the start of your first month. For credit cards and loans, enter what you owe as a negative number (tap +/−).</div>
+    <label for="aeAlert">Notify me when the balance drops below</label>
+    <input id="aeAlert" type="text" inputmode="decimal" placeholder="No alert" autocomplete="off">
+    <button class="save" id="aeSave" type="button" style="background:var(--blue)">Save account</button>
+    <button class="btn2 danger" id="aeDelete" type="button">Delete account</button>
+    <div class="hint" id="aeUsed" style="margin-top:10px"></div>
+    <div class="msg" id="aeMsg"></div>
+  </section>
+  </main>
+
+  <!-- Live QR scanner -->
+  <div id="live" class="hide">
+    <video id="liveVideo" playsinline muted></video>
+    <div class="frame" id="liveFrame"></div>
+    <div class="top">Point the camera at the invoice QR code</div>
+    <div id="liveErr" class="hide"></div>
+    <div class="bottom">
+      <label id="livePhoto" for="photo">Take a photo</label>
+      <button type="button" id="liveCancel">Cancel</button>
+    </div>
+  </div>
+  <input id="photo" type="file" accept="image/*" capture="environment">
+
+  <div id="toast" class="hide" role="status" aria-live="polite"></div>
+  <div id="busy" class="hide" role="status" aria-live="polite"><div class="spinner"></div><div id="busyText">Loading…</div></div>
+
+  <nav class="bottombar" id="bottombar">
+    <button type="button" data-view="Add">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>Add</button>
+    <button type="button" data-view="Accounts">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10l9-6 9 6"/><path d="M5 10v8M9.5 10v8M14.5 10v8M19 10v8M3 20h18"/></svg>Accounts</button>
+    <button type="button" class="fab" id="scanBtn" aria-label="Scan invoice QR">
+      <span class="fabCircle"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3"/><rect x="8" y="8" width="3" height="3"/><rect x="13" y="8" width="3" height="3"/><rect x="8" y="13" width="3" height="3"/><path d="M13 13h3v3"/></svg></span>Scan</button>
+    <button type="button" data-view="Month">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20V12M10 20V6M15 20v-9M20 20V9"/></svg>Month</button>
+    <button type="button" data-view="Settings">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>Settings</button>
+  </nav>
+
+  <script src="jsQR.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
