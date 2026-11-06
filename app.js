@@ -135,6 +135,8 @@ async function sync() {
     lastSync = new Date().toISOString(); store.set('lastSync', lastSync);
     syncError = '';
     render();
+    deliver(j.notify);                 // notifications the sheet prepared (partner, budget, low balance)
+    bookReminders();
   } catch (e) {
     // A slow answer or a dropped connection is not an error: the change stays on the phone and is
     // sent again (anything that already reached the sheet is recognised by its ID and skipped).
@@ -172,6 +174,50 @@ window.addEventListener('online', () => { status(); sync(); });
 window.addEventListener('offline', status);
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') sync(); });
 setInterval(() => { if (document.visibilityState === 'visible') sync(); }, 60000);
+
+/* ---------- Notifications (ntfy) ----------
+ * Google's servers can't reach ntfy.sh, so the phones deliver the notifications themselves.
+ * Messages that can't be sent right now wait on the phone and go out with the next sync. */
+let nq = store.get('nq', []), delivering = false;
+async function ntfyPost(body) {
+  // text/plain keeps this a simple request; ntfy reads the JSON body either way.
+  const res = await fetch('https://ntfy.sh/', { method: 'POST', body: JSON.stringify(body),
+                                                headers: { 'Content-Type': 'text/plain;charset=utf-8' } });
+  if (!res.ok) throw new Error('ntfy answered ' + res.status);
+}
+async function deliver(list) {
+  if (list && list.length) { nq = nq.concat(list).slice(-50); store.set('nq', nq); }
+  if (delivering || !nq.length || !navigator.onLine) return;
+  delivering = true;
+  try {
+    while (nq.length) {
+      try { await ntfyPost(nq[0]); } catch (e) { break; }
+      nq.shift(); store.set('nq', nq);
+    }
+  } finally { delivering = false; }
+}
+// Daily reminder: ntfy can hold a message until a set time, so the phone books the reminder
+// for today (if nothing is logged yet) and the next two days, each time the app syncs.
+async function bookReminders() {
+  const s = data && data.setup;
+  if (!s || !s.myTopic || !navigator.onLine) return;
+  const booked = store.get('reminders', {}), hour = Number(s.reminderHour), now = Date.now();
+  const loggedToday = entries().some(e => e.date === today() && e.who === s.me);
+  const ymd = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  for (let i = 0; i < 3; i++) {
+    const at = new Date(); at.setDate(at.getDate() + i); at.setHours(hour, 0, 0, 0);
+    const key = ymd(at) + '@' + hour;
+    if (booked[key] || at.getTime() < now + 2 * 60000 || (i === 0 && loggedToday)) continue;
+    try {
+      await ntfyPost({ topic: s.myTopic, title: '📝 Money · Reminder', message: 'Time to log today\'s expenses (ignore this if you already did).',
+                       delay: String(Math.floor(at.getTime() / 1000)), click: location.href.split('#')[0] });
+      booked[key] = true;
+    } catch (e) { break; }
+  }
+  const yesterday = ymd(new Date(now - 86400000));
+  Object.keys(booked).forEach(k => { if (k.slice(0, 10) < yesterday) delete booked[k]; });
+  store.set('reminders', booked);
+}
 
 /* ---------- The data as the app shows it: sheet copy + changes not synced yet ---------- */
 function entries() {
@@ -974,6 +1020,13 @@ $('budSet').addEventListener('click', () => {
   settingsCall('setBudget', { name: c, amount: a }, 'setMsg', '', () => { $('budAmt').value = ''; flash('setMsg', 'Budget for ' + c + ': ' + fmt(a) + ' ALL.', true); });
 });
 $('remSave').addEventListener('click', () => settingsCall('saveReminder', { hour: Number($('remHour').value) }, 'setMsg', 'Reminder time saved.'));
+$('ntfyTest').addEventListener('click', async () => {
+  if (!S().myTopic) return toast('No topic yet: run setupApp in Apps Script.', 'err');
+  try {
+    await ntfyPost({ topic: S().myTopic, title: '🔔 Money · Test', message: 'Notifications work on this phone.' });
+    toast('Test sent. It should appear in ntfy within a few seconds.', 'ok');
+  } catch (e) { toast('Couldn\'t reach ntfy (' + e.message + '). Check the internet connection.', 'err'); }
+});
 $('ntfyCopy').addEventListener('click', async () => {
   try { await navigator.clipboard.writeText(S().myTopic); toast('Topic copied.'); }
   catch (e) { toast('Couldn\'t copy. Select the topic and copy it by hand.', true); }
@@ -1017,7 +1070,7 @@ function start() {
 /* ---------- App updates ----------
  * The app keeps its files on the phone (that's what makes it open offline). New versions are
  * fetched in the background; when one is ready the status pill turns into "Update ↻". */
-const APP_VERSION = 7;
+const APP_VERSION = 8;
 let swReg = null, updateReady = false;
 function showUpdate() { if (!updateReady) { updateReady = true; status(); toast('A new version of Money is ready. Tap "Update" at the top.', 'info'); } }
 function applyUpdate() {
