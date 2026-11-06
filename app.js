@@ -1109,7 +1109,7 @@ window.addEventListener('hashchange', () => {
 /* ---------- App updates ----------
  * The app keeps its files on the phone (that's what makes it open offline). New versions are
  * fetched in the background; when one is ready the status pill turns into "Update ↻". */
-const APP_VERSION = 18;
+const APP_VERSION = 19;
 let swReg = null, updateReady = false;
 function showUpdate() { if (!updateReady) { updateReady = true; status(); toast('A new version of Money is ready. Tap "Update" at the top.', 'info'); } }
 function applyUpdate() {
@@ -1123,8 +1123,9 @@ async function checkUpdate(manual) {
   if (!swReg) { if (manual) toast('Updates can\'t be checked in this browser.', 'err'); return; }
   if (!navigator.onLine) { if (manual) toast('You are offline. Check again when you are online.', 'err'); return; }
   try { await swReg.update(); } catch (e) { if (manual) toast('Couldn\'t check for updates. Try again later.', 'err'); return; }
-  if (swReg.installing || swReg.waiting) showUpdate();
-  else if (manual) setTimeout(() => { if (!updateReady) toast('You have the latest version (' + APP_VERSION + ').', 'ok'); }, 1500);
+  if (manual) await new Promise(r => setTimeout(r, 1500));          // give a found update a moment to download
+  if (swReg.installing || swReg.waiting || updateReady) showUpdate();
+  else if (manual) toast('You have the latest version (' + APP_VERSION + ').', 'ok');
 }
 if ('serviceWorker' in navigator) {
   const hadController = !!navigator.serviceWorker.controller;
@@ -1141,7 +1142,14 @@ if ('serviceWorker' in navigator) {
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') checkUpdate(false); });
 }
 $('appVer').textContent = 'Money app version ' + APP_VERSION;
-$('checkUpd').addEventListener('click', () => checkUpdate(true));
+$('checkUpd').addEventListener('click', async () => {
+  const b = $('checkUpd');
+  if (b.disabled) return;
+  b.disabled = true;
+  b.innerHTML = '<span class="miniSpin"></span>Checking…';
+  try { await checkUpdate(true); }
+  finally { b.disabled = false; b.textContent = 'Check for updates'; }
+});
 if (cfg && data) start();
 else if (cfg) { showView('Connect'); $('connMsg').className = 'msg'; busy('Loading your data…');
   api('pull').then(j => { data = j.data; saveData(); idle(); start(); })
