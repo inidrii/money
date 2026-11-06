@@ -180,9 +180,10 @@ setInterval(() => { if (document.visibilityState === 'visible') sync(); }, 60000
  * Messages that can't be sent right now wait on the phone and go out with the next sync. */
 let nq = store.get('nq', []), delivering = false;
 async function ntfyPost(body) {
-  // Tapping a notification opens the installed Home Screen app: iPhone opens a web app for
-  // addresses written as webapp://https://… (a plain https:// link would open Safari instead).
-  body = Object.assign({}, body, { click: 'webapp://' + location.origin + location.pathname });
+  // Tapping a notification runs the iPhone Shortcut "Open Money", which opens the installed
+  // Home Screen app (webapp://https://…). ntfy can't open webapp:// links itself, and a plain
+  // https:// link would open Safari instead of the installed app.
+  body = Object.assign({}, body, { click: 'shortcuts://run-shortcut?name=' + encodeURIComponent('Open Money') });
   // text/plain keeps this a simple request; ntfy reads the JSON body either way.
   const res = await fetch('https://ntfy.sh/', { method: 'POST', body: JSON.stringify(body),
                                                 headers: { 'Content-Type': 'text/plain;charset=utf-8' } });
@@ -1073,7 +1074,7 @@ function start() {
 /* ---------- App updates ----------
  * The app keeps its files on the phone (that's what makes it open offline). New versions are
  * fetched in the background; when one is ready the status pill turns into "Update ↻". */
-const APP_VERSION = 11;
+const APP_VERSION = 12;
 let swReg = null, updateReady = false;
 function showUpdate() { if (!updateReady) { updateReady = true; status(); toast('A new version of Money is ready. Tap "Update" at the top.', 'info'); } }
 function applyUpdate() {
