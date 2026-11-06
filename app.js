@@ -40,14 +40,32 @@ function tabName(key) { return MONTHS[key % 12] + ' ' + Math.floor(key / 12); }
 function currentKey() { return keyOfDate(today()); }
 function keyOf(e) { return e.date ? keyOfDate(e.date) : keyOfTab(e.tab); }
 
+// Messages slide down from the top (✓ success, ⚠ problem); tap to close.
 let toastTimer = null;
-function toast(text, isErr) {
+function toast(text, type) {
+  const kind = type === true || type === 'err' ? 'err' : type === 'ok' ? 'ok' : 'info';
   const t = $('toast');
-  t.textContent = text; t.className = isErr ? 'err' : '';
+  $('toastIcon').textContent = kind === 'err' ? '⚠' : kind === 'ok' ? '✓' : 'ℹ';
+  $('toastText').textContent = text;
+  t.className = kind;
+  void t.offsetWidth;                       // restart the slide-in when messages follow each other
+  t.classList.add('show');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => t.classList.add('hide'), isErr ? 6000 : 2600);
+  toastTimer = setTimeout(() => t.classList.remove('show'), kind === 'err' ? 6000 : 2800);
 }
-function flash(id, text, ok) { const m = $(id); m.textContent = text; m.className = 'msg ' + (ok ? 'ok' : 'err'); }
+$('toast').addEventListener('click', () => $('toast').classList.remove('show'));
+function flash(id, text, ok) {
+  if (id === 'connMsg') { const m = $(id); m.textContent = text; m.className = 'msg ' + (ok ? 'ok' : 'err'); return; }
+  toast(text, ok ? 'ok' : 'err');
+}
+// Points at a field that needs fixing: red outline, scroll to it, and say why.
+function invalid(fieldId, text) {
+  const f = $(fieldId);
+  if (f) { f.classList.add('invalid'); f.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
+  toast(text, 'err');
+}
+document.addEventListener('input', ev => ev.target.classList && ev.target.classList.remove('invalid'));
+document.addEventListener('change', ev => ev.target.classList && ev.target.classList.remove('invalid'));
 function busy(text) { $('busyText').textContent = text; $('busy').classList.remove('hide'); }
 function idle() { $('busy').classList.add('hide'); }
 
@@ -440,6 +458,14 @@ function scanFrame() {
 }
 $('scanBtn').addEventListener('click', openScanner);
 $('liveCancel').addEventListener('click', closeScanner);
+// Paste an invoice link copied elsewhere (e.g. from the iPhone camera or a message).
+$('livePaste').addEventListener('click', async () => {
+  let text = '';
+  try { text = await navigator.clipboard.readText(); } catch (e) {}
+  if (!/[?&]prc=/.test(text)) return toast('No invoice link on the clipboard. Copy the link first, then tap Paste link.', 'err');
+  closeScanner();
+  applyLink(text.trim());
+});
 
 function loadImage(file) {
   return new Promise((res, rej) => { const img = new Image(); img.onload = () => res(img); img.onerror = rej; img.src = URL.createObjectURL(file); });
@@ -486,22 +512,24 @@ function formEntry() {
     description: $('description').value.trim(), who: $('who').value
   };
 }
+// Returns [message, field] for the first problem, or null.
 function checkEntry(e) {
   const okAmt = e.type === 'Adjustment' ? (!isNaN(e.amount) && e.amount !== 0) : e.amount > 0;
-  if (!e.date || !okAmt) return 'Enter an amount and a date.';
-  if (MODES[e.type].cats && !e.category) return 'Choose a category.';
+  if (!okAmt) return ['Enter an amount.', 'amount'];
+  if (!e.date) return ['Choose a date.', 'date'];
   if (e.type === 'Transfer') {
-    if (!e.toAccount) return 'Choose the account the money goes to.';
-    if (e.toAccount === e.account) return 'From and To must be different accounts.';
-    if (!$('receivedBlock').classList.contains('hide') && !(e.received > 0)) return 'Enter the amount received.';
+    if (!e.toAccount) return ['Choose the account the money goes to.', 'toAccount'];
+    if (e.toAccount === e.account) return ['From and To must be different accounts.', 'toAccount'];
+    if (!$('receivedBlock').classList.contains('hide') && !(e.received > 0)) return ['Enter the amount received.', 'received'];
   }
-  return '';
+  if (MODES[e.type].cats && !e.category) return ['Choose a category.', 'category'];
+  return null;
 }
 
 $('save').addEventListener('click', () => {
   const e = formEntry();
-  const err = checkEntry(e);
-  if (err) return flash('msg', err, false);
+  const bad = checkEntry(e);
+  if (bad) return invalid(bad[1], bad[0]);
   if (editTx) return saveEdit(e);
   if (invoice.iic) {
     if (entries().some(x => (x.note || '').includes(invoice.iic) || x.iic === invoice.iic)) return flash('msg', 'This invoice is already saved.', false);
@@ -515,7 +543,7 @@ $('save').addEventListener('click', () => {
   store.set('lastAccount_' + mode, e.account);
   store.set('lastAccountCur_' + currencyOf(e.account), e.account);
   if (mode === 'Transfer') store.set('lastTo', e.toAccount);
-  toast(navigator.onLine ? e.type + ' saved.' : e.type + ' saved on this phone. It will sync when you are online.');
+  toast(navigator.onLine ? e.type + ' saved.' : e.type + ' saved on this phone. It will sync when you are online.', 'ok');
   resetForm();
 });
 
@@ -554,7 +582,7 @@ function leaveEdit(text) {
   endEdit();
   if (back === 'Account' && accName) { openAccount(accName); }
   else showView(back || 'Month');
-  toast(text);
+  toast(text, 'ok');
 }
 function saveEdit(e) {
   const id = editTx.id;
@@ -681,7 +709,7 @@ $('adSave').addEventListener('click', () => {
                                           description: 'Balance correction', who: S().me || '' } });
   $('adFixBox').classList.add('hide');
   renderAccount();
-  toast('Corrected by ' + money(r.diff, r.currency, true) + '.');
+  toast('Corrected by ' + money(r.diff, r.currency, true) + '.', 'ok');
 });
 
 /* ---------- Transaction lists ---------- */
