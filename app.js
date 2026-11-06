@@ -1031,21 +1031,6 @@ $('ntfyTest').addEventListener('click', async () => {
     toast('Test sent. It should appear in ntfy within a few seconds.', 'ok');
   } catch (e) { toast('Couldn\'t reach ntfy (' + e.message + '). Check the internet connection.', 'err'); }
 });
-// Temporary: tries other ways of writing the "open the installed app" link.
-const LINK_TESTS = {
-  A: () => 'webapp://' + location.host + location.pathname,
-  B: () => 'webapp://' + encodeURIComponent(location.origin + location.pathname),
-  C: () => 'webapp:' + location.origin + location.pathname
-};
-document.querySelectorAll('[data-linktest]').forEach(btn => btn.addEventListener('click', async () => {
-  const k = btn.dataset.linktest, link = LINK_TESTS[k]();
-  try {
-    const res = await fetch('https://ntfy.sh/', { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ topic: S().myTopic, title: '🔗 Money · Link test ' + k, message: link, click: link }) });
-    if (!res.ok) throw new Error('ntfy answered ' + res.status);
-    toast('Test ' + k + ' sent. Tap the notification.', 'ok');
-  } catch (e) { toast('Couldn\'t send: ' + e.message, 'err'); }
-}));
 $('ntfyCopy').addEventListener('click', async () => {
   try { await navigator.clipboard.writeText(S().myTopic); toast('Topic copied.'); }
   catch (e) { toast('Couldn\'t copy. Select the topic and copy it by hand.', true); }
@@ -1079,17 +1064,23 @@ $('connGo').addEventListener('click', async () => {
 });
 
 /* ---------- Start ---------- */
+// Opening the app with #month in the address (e.g. from a notification, through the
+// "Open Money" shortcut) goes straight to this month's transactions.
+function wantsMonth() { return /(^#|[#&])month\b/i.test(location.hash); }
 function start() {
   setMode('Expense');
   resetForm();
-  showView('Add');
+  if (wantsMonth()) { monthKey = currentKey(); showView('Month'); } else showView('Add');
   status();
   sync();
 }
+window.addEventListener('hashchange', () => {
+  if (data && wantsMonth()) { if (editTx) endEdit(); monthKey = currentKey(); showView('Month'); sync(); }
+});
 /* ---------- App updates ----------
  * The app keeps its files on the phone (that's what makes it open offline). New versions are
  * fetched in the background; when one is ready the status pill turns into "Update ↻". */
-const APP_VERSION = 13;
+const APP_VERSION = 14;
 let swReg = null, updateReady = false;
 function showUpdate() { if (!updateReady) { updateReady = true; status(); toast('A new version of Money is ready. Tap "Update" at the top.', 'info'); } }
 function applyUpdate() {
