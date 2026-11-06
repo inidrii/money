@@ -637,7 +637,7 @@ function startEdit(t, back) {
   showView('Add');
   $('msg').className = 'msg';
   setMode(t.type);
-  $('addTitle').textContent = 'Edit entry';
+  $('addTitle').textContent = 'Edit';
   $('editBar').classList.remove('hide');
   $('editDelete').classList.remove('armed'); $('editDelete').textContent = 'Delete entry';
   $('link').value = '';
@@ -1109,7 +1109,7 @@ window.addEventListener('hashchange', () => {
 /* ---------- App updates ----------
  * The app keeps its files on the phone (that's what makes it open offline). New versions are
  * fetched in the background; when one is ready the status pill turns into "Update ↻". */
-const APP_VERSION = 19;
+const APP_VERSION = 20;
 let swReg = null, updateReady = false;
 function showUpdate() { if (!updateReady) { updateReady = true; status(); toast('A new version of Money is ready. Tap "Update" at the top.', 'info'); } }
 function applyUpdate() {

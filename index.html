@@ -60,6 +60,14 @@
     #sync.update .dot { display:none; }
     @keyframes pulse { 50% { opacity:.3; } }
 
+    /* Title · compact switch · (sync pill) on one line, for Add and Month */
+    .headRow { display:flex; align-items:center; gap:8px; margin-right:100px; min-height:34px; }
+    .headRow h1 { flex:none; padding-right:0; font-size:20px; }
+    .headRow .tabs, .headRow .switch { flex:1; min-width:0; margin-top:0; padding:3px; gap:3px; border-radius:10px; }
+    .headRow .tabs button { padding:5px 2px; font-size:13px; border-radius:7px; }
+    .headRow .switch button { min-width:30px; min-height:28px; font-size:17px !important; border-radius:7px; }
+    .headRow .switchTitle { font-size:14px; white-space:nowrap; }
+
     /* Type tabs (Expense / Income / Transfer) */
     .tabs { display:flex; background:rgba(255,255,255,.14); border-radius:12px; padding:4px; gap:4px; margin-top:10px; }
     .tabs button { flex:1; border:0; background:transparent; padding:10px 4px; font-size:15px; font-weight:600;
@@ -213,11 +221,13 @@
   <!-- Add / edit an entry -->
   <section id="viewAdd" class="hide">
     <div class="head">
-      <h1 id="addTitle">Add</h1>
-      <div class="tabs" id="tabs">
-        <button type="button" data-type="Expense" class="on">Expense</button>
-        <button type="button" data-type="Income">Income</button>
-        <button type="button" data-type="Transfer">Transfer</button>
+      <div class="headRow">
+        <h1 id="addTitle">Add</h1>
+        <div class="tabs" id="tabs">
+          <button type="button" data-type="Expense" class="on">Expense</button>
+          <button type="button" data-type="Income">Income</button>
+          <button type="button" data-type="Transfer">Transfer</button>
+        </div>
       </div>
     </div>
     <div id="scanBlock"><input id="link" type="hidden"></div>
@@ -296,11 +306,13 @@
 
   <section id="viewMonth" class="hide">
     <div class="head">
-      <h1>Month</h1>
-      <div class="switch">
-        <button type="button" id="mPrev" aria-label="Previous month">‹</button>
-        <div id="mTitle" class="switchTitle">Month</div>
-        <button type="button" id="mNext" aria-label="Next month">›</button>
+      <div class="headRow">
+        <h1>Month</h1>
+        <div class="switch">
+          <button type="button" id="mPrev" aria-label="Previous month">‹</button>
+          <div id="mTitle" class="switchTitle">Month</div>
+          <button type="button" id="mNext" aria-label="Next month">›</button>
+        </div>
       </div>
     </div>
     <div class="totals" id="mTotals"></div>
