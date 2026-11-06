@@ -224,7 +224,7 @@ async function bookReminders() {
 }
 
 /* New notifications → Month. iOS opens the app without telling it a notification was tapped,
- * so the app reads its own ntfy topic: anything new since last time (not reminders/tests)
+ * so the app reads its own ntfy topic: anything new since last time (except reminders)
  * means "go to Month and show it". */
 let checkingNews = false;
 async function checkNews() {
@@ -240,7 +240,7 @@ async function checkNews() {
       .filter(m => m && m.event === 'message' && m.id);
     if (!msgs.length) return;
     store.set('ntfySince', msgs[msgs.length - 1].id);
-    const news = msgs.filter(m => !/Reminder|Test/.test(m.title || ''));
+    const news = msgs.filter(m => !/Reminder/.test(m.title || ''));   // test notifications count, so you can try it
     if (!news.length) return;
     const busyTyping = editTx || (view === 'Add' && ($('amount').value || $('description').value));
     if (!busyTyping) { monthKey = currentKey(); showView('Month'); }
@@ -1109,7 +1109,7 @@ window.addEventListener('hashchange', () => {
 /* ---------- App updates ----------
  * The app keeps its files on the phone (that's what makes it open offline). New versions are
  * fetched in the background; when one is ready the status pill turns into "Update ↻". */
-const APP_VERSION = 15;
+const APP_VERSION = 16;
 let swReg = null, updateReady = false;
 function showUpdate() { if (!updateReady) { updateReady = true; status(); toast('A new version of Money is ready. Tap "Update" at the top.', 'info'); } }
 function applyUpdate() {
