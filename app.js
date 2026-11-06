@@ -180,6 +180,9 @@ setInterval(() => { if (document.visibilityState === 'visible') sync(); }, 60000
  * Messages that can't be sent right now wait on the phone and go out with the next sync. */
 let nq = store.get('nq', []), delivering = false;
 async function ntfyPost(body) {
+  // No tap-through link: on iPhone a link opens Safari, not the installed app (which then asks
+  // for the connection code). Tapping the notification opens ntfy with the full message instead.
+  body = Object.assign({}, body); delete body.click;
   // text/plain keeps this a simple request; ntfy reads the JSON body either way.
   const res = await fetch('https://ntfy.sh/', { method: 'POST', body: JSON.stringify(body),
                                                 headers: { 'Content-Type': 'text/plain;charset=utf-8' } });
@@ -210,7 +213,7 @@ async function bookReminders() {
     if (booked[key] || at.getTime() < now + 2 * 60000 || (i === 0 && loggedToday)) continue;
     try {
       await ntfyPost({ topic: s.myTopic, title: '📝 Money · Reminder', message: 'Time to log today\'s expenses (ignore this if you already did).',
-                       delay: String(Math.floor(at.getTime() / 1000)), click: location.href.split('#')[0] });
+                       delay: String(Math.floor(at.getTime() / 1000)) });
       booked[key] = true;
     } catch (e) { break; }
   }
@@ -1070,7 +1073,7 @@ function start() {
 /* ---------- App updates ----------
  * The app keeps its files on the phone (that's what makes it open offline). New versions are
  * fetched in the background; when one is ready the status pill turns into "Update ↻". */
-const APP_VERSION = 8;
+const APP_VERSION = 9;
 let swReg = null, updateReady = false;
 function showUpdate() { if (!updateReady) { updateReady = true; status(); toast('A new version of Money is ready. Tap "Update" at the top.', 'info'); } }
 function applyUpdate() {
