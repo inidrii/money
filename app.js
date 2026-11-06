@@ -172,7 +172,7 @@ $('sync').addEventListener('click', () => {
 });
 window.addEventListener('online', () => { status(); sync(); });
 window.addEventListener('offline', status);
-document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') sync(); });
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { checkNews(); sync(); } });
 setInterval(() => { if (document.visibilityState === 'visible') sync(); }, 60000);
 
 /* ---------- Notifications (ntfy) ----------
@@ -221,6 +221,34 @@ async function bookReminders() {
   const yesterday = ymd(new Date(now - 86400000));
   Object.keys(booked).forEach(k => { if (k.slice(0, 10) < yesterday) delete booked[k]; });
   store.set('reminders', booked);
+}
+
+/* New notifications → Month. iOS opens the app without telling it a notification was tapped,
+ * so the app reads its own ntfy topic: anything new since last time (not reminders/tests)
+ * means "go to Month and show it". */
+let checkingNews = false;
+async function checkNews() {
+  const s = data && data.setup;
+  if (!s || !s.myTopic || !navigator.onLine || checkingNews) return;
+  const since = store.get('ntfySince', null);
+  if (!since) { store.set('ntfySince', String(Math.floor(Date.now() / 1000))); return; }   // first run: start from now
+  checkingNews = true;
+  try {
+    const res = await fetch('https://ntfy.sh/' + encodeURIComponent(s.myTopic) + '/json?poll=1&since=' + encodeURIComponent(since));
+    if (!res.ok) return;
+    const msgs = (await res.text()).split('\n').filter(Boolean).map(l => { try { return JSON.parse(l); } catch (e) { return null; } })
+      .filter(m => m && m.event === 'message' && m.id);
+    if (!msgs.length) return;
+    store.set('ntfySince', msgs[msgs.length - 1].id);
+    const news = msgs.filter(m => !/Reminder|Test/.test(m.title || ''));
+    if (!news.length) return;
+    const busyTyping = editTx || (view === 'Add' && ($('amount').value || $('description').value));
+    if (!busyTyping) { monthKey = currentKey(); showView('Month'); }
+    const last = news[news.length - 1];
+    toast(news.length === 1 ? (last.title || '').replace(/^\S+\s+Money · /, '') + ': ' + (last.message || '').split('\n')[0]
+                            : news.length + ' new notifications — see Month.', 'info');
+  } catch (e) { /* offline or ntfy unreachable: try next time */ }
+  finally { checkingNews = false; }
 }
 
 /* ---------- The data as the app shows it: sheet copy + changes not synced yet ---------- */
@@ -1072,6 +1100,7 @@ function start() {
   resetForm();
   if (wantsMonth()) { monthKey = currentKey(); showView('Month'); } else showView('Add');
   status();
+  checkNews();
   sync();
 }
 window.addEventListener('hashchange', () => {
@@ -1080,7 +1109,7 @@ window.addEventListener('hashchange', () => {
 /* ---------- App updates ----------
  * The app keeps its files on the phone (that's what makes it open offline). New versions are
  * fetched in the background; when one is ready the status pill turns into "Update ↻". */
-const APP_VERSION = 14;
+const APP_VERSION = 15;
 let swReg = null, updateReady = false;
 function showUpdate() { if (!updateReady) { updateReady = true; status(); toast('A new version of Money is ready. Tap "Update" at the top.', 'info'); } }
 function applyUpdate() {
