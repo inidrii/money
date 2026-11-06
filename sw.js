@@ -1,6 +1,6 @@
 /* Keeps the app's own files on the phone so it opens instantly and works offline.
  * Data is not cached here: the app stores it itself and syncs with the Google Sheet. */
-const VERSION = 'money-v6';
+const VERSION = 'money-v7';
 const FILES = ['./', 'index.html', 'app.js', 'jsQR.js', 'manifest.webmanifest', 'icon-180.png', 'icon-192.png', 'icon-512.png'];
 
 self.addEventListener('install', e => {

@@ -95,7 +95,7 @@ function decodeCode(s) {
 /* ---------- Talking to the sheet ---------- */
 async function api(action, payload) {
   const ctl = new AbortController();
-  const timer = setTimeout(() => ctl.abort(), 45000);
+  const timer = setTimeout(() => ctl.abort(), 120000);
   try {
     // text/plain keeps this a "simple" request, which Google's servers accept from another site.
     const res = await fetch(cfg.u, {
@@ -107,7 +107,7 @@ async function api(action, payload) {
     if (!j.ok) { const e = new Error(j.error || 'Something went wrong.'); e.auth = !!j.auth; e.server = true; throw e; }
     return j;
   } catch (e) {
-    if (e.name === 'AbortError') throw new Error('The sheet took too long to answer.');
+    if (e.name === 'AbortError') { const t = new Error('The sheet took too long to answer.'); t.network = true; throw t; }
     if (!e.server) e.network = true;
     throw e;
   } finally { clearTimeout(timer); }
@@ -136,11 +136,15 @@ async function sync() {
     syncError = '';
     render();
   } catch (e) {
+    // A slow answer or a dropped connection is not an error: the change stays on the phone and is
+    // sent again (anything that already reached the sheet is recognised by its ID and skipped).
     syncError = e.network ? '' : e.message;
     if (e.auth) { toast(e.message, true); }
+    if (e.network && outbox.length) syncAgain = 'later';
   } finally {
     syncing = false; status();
-    if (syncAgain && !syncError && navigator.onLine) scheduleSync(200);
+    if (syncAgain === 'later') { syncAgain = false; scheduleSync(15000); }
+    else if (syncAgain && !syncError && navigator.onLine) scheduleSync(200);
   }
 }
 
@@ -1013,7 +1017,7 @@ function start() {
 /* ---------- App updates ----------
  * The app keeps its files on the phone (that's what makes it open offline). New versions are
  * fetched in the background; when one is ready the status pill turns into "Update ↻". */
-const APP_VERSION = 6;
+const APP_VERSION = 7;
 let swReg = null, updateReady = false;
 function showUpdate() { if (!updateReady) { updateReady = true; status(); toast('A new version of Money is ready. Tap "Update" at the top.', 'info'); } }
 function applyUpdate() {
