@@ -213,9 +213,20 @@ async function bookReminders() {
   const booked = store.get('reminders', {}), hour = Number(s.reminderHour), now = Date.now();
   const loggedToday = entries().some(e => e.date === today() && e.who === s.me);
   const ymd = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  // Reminders already booked on the topic, by any copy of the app (Home Screen app, Safari, the
+  // other phone's old install…): ntfy lists scheduled messages with sched=1. Never book a second one.
+  const already = new Set();
+  try {
+    const res = await fetch('https://ntfy.sh/' + encodeURIComponent(s.myTopic) + '/json?poll=1&sched=1&since=all');
+    if (!res.ok) return;
+    (await res.text()).split('\n').forEach(l => {
+      try { const m = JSON.parse(l); if (/Reminder/.test(m.title || '')) already.add(Number(m.time)); } catch (e) {}
+    });
+  } catch (e) { return; }
   for (let i = 0; i < 3; i++) {
     const at = new Date(); at.setDate(at.getDate() + i); at.setHours(hour, 0, 0, 0);
     const key = ymd(at) + '@' + hour;
+    if (already.has(Math.floor(at.getTime() / 1000))) { booked[key] = true; continue; }
     if (booked[key] || at.getTime() < now + 2 * 60000 || (i === 0 && loggedToday)) continue;
     try {
       await ntfyPost({ topic: s.myTopic, title: '📝 Money · Reminder', message: 'Time to log today\'s expenses (ignore this if you already did).',
@@ -1114,7 +1125,7 @@ window.addEventListener('hashchange', () => {
 /* ---------- App updates ----------
  * The app keeps its files on the phone (that's what makes it open offline). New versions are
  * fetched in the background; when one is ready the status pill turns into "Update ↻". */
-const APP_VERSION = 21;
+const APP_VERSION = 22;
 let swReg = null, updateReady = false;
 function showUpdate() { if (!updateReady) { updateReady = true; status(); toast('A new version of Money is ready. Tap ⬆ at the top right to update.', 'info'); } }
 function applyUpdate() {
