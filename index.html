@@ -21,7 +21,11 @@
       --top:env(safe-area-inset-top, 0px); --bottom:env(safe-area-inset-bottom, 0px);
     }
     * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
-    html, body { margin:0; background:var(--bg); color:var(--text); overflow-x:hidden; }
+    /* Navy base + a fixed navy strip under the status bar: iOS tints its status-bar glass
+       from a fixed element at the top, so it stays navy instead of a pale fade. */
+    html { margin:0; background:var(--navy); }
+    body { margin:0; background:var(--bg); color:var(--text); overflow-x:hidden; min-height:100vh; }
+    #statusShim { position:fixed; top:0; left:0; right:0; height:var(--top); background:var(--navy); z-index:7; pointer-events:none; }
     body { font-family:-apple-system, BlinkMacSystemFont, "SF Pro Text", Roboto, Arial, sans-serif; font-size:16px; }
     main { max-width:520px; margin:0 auto; padding:0 16px calc(104px + var(--bottom)); }
     .hide { display:none !important; }
@@ -173,6 +177,7 @@
   </style>
 </head>
 <body>
+  <div id="statusShim" aria-hidden="true"></div>
   <button id="sync" type="button" class="hide"><span class="dot"></span><span id="syncText">Synced</span></button>
 
   <main>
