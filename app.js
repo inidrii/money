@@ -154,10 +154,12 @@ function status() {
   else if (!navigator.onLine) { cls = 'offline'; text = n ? 'Offline · ' + n : 'Offline'; }
   else if (syncError) { cls = 'error'; text = 'Sync error'; }
   else if (n) { cls = 'syncing'; text = n + ' waiting'; }
+  if (updateReady && !syncing) { cls = 'update'; text = 'Update ↻'; }     // a new app version is ready
   b.className = cls;
   $('syncText').textContent = text;
 }
 $('sync').addEventListener('click', () => {
+  if (updateReady) return applyUpdate();
   if (syncError) toast(syncError, true);
   else if (!navigator.onLine) toast(outbox.length ? 'Offline. ' + outbox.length + ' change(s) will sync when you are back online.' : 'Offline. Everything is saved on this phone.');
   sync();
@@ -1008,7 +1010,42 @@ function start() {
   status();
   sync();
 }
-if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+/* ---------- App updates ----------
+ * The app keeps its files on the phone (that's what makes it open offline). New versions are
+ * fetched in the background; when one is ready the status pill turns into "Update ↻". */
+const APP_VERSION = 5;
+let swReg = null, updateReady = false;
+function showUpdate() { if (!updateReady) { updateReady = true; status(); toast('A new version of Money is ready. Tap "Update" at the top.', 'info'); } }
+function applyUpdate() {
+  if (outbox.length && navigator.onLine) toast('Updating…');
+  location.reload();
+}
+async function checkUpdate(manual) {
+  if (!swReg && 'serviceWorker' in navigator) {        // may still be starting right after the app opened
+    try { swReg = (await navigator.serviceWorker.getRegistration()) || null; } catch (e) {}
+  }
+  if (!swReg) { if (manual) toast('Updates can\'t be checked in this browser.', 'err'); return; }
+  if (!navigator.onLine) { if (manual) toast('You are offline. Check again when you are online.', 'err'); return; }
+  try { await swReg.update(); } catch (e) { if (manual) toast('Couldn\'t check for updates. Try again later.', 'err'); return; }
+  if (swReg.installing || swReg.waiting) showUpdate();
+  else if (manual) setTimeout(() => { if (!updateReady) toast('You have the latest version (' + APP_VERSION + ').', 'ok'); }, 1500);
+}
+if ('serviceWorker' in navigator) {
+  const hadController = !!navigator.serviceWorker.controller;
+  navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then(reg => {
+    swReg = reg;
+    reg.addEventListener('updatefound', () => {
+      const w = reg.installing;
+      if (w) w.addEventListener('statechange', () => {
+        if ((w.state === 'installed' || w.state === 'activated') && hadController) showUpdate();
+      });
+    });
+    checkUpdate(false);
+  }).catch(() => {});
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') checkUpdate(false); });
+}
+$('appVer').textContent = 'Money app version ' + APP_VERSION;
+$('checkUpd').addEventListener('click', () => checkUpdate(true));
 if (cfg && data) start();
 else if (cfg) { showView('Connect'); $('connMsg').className = 'msg'; busy('Loading your data…');
   api('pull').then(j => { data = j.data; saveData(); idle(); start(); })

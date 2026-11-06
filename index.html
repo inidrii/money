@@ -54,6 +54,8 @@
     #sync.syncing .dot { background:var(--amber); animation:pulse 1s infinite; }
     #sync.offline .dot { background:#cbd5e1; }
     #sync.error .dot { background:#f87171; }
+    #sync.update { background:var(--amber); color:var(--navy); }
+    #sync.update .dot { display:none; }
     @keyframes pulse { 50% { opacity:.3; } }
 
     /* Type tabs (Expense / Income / Transfer) */
@@ -348,7 +350,8 @@
 
     <h2>This phone</h2>
     <button type="button" class="btn2 danger" id="disconnect">Disconnect this phone</button>
-    <div class="hint" style="text-align:center;margin-top:14px">Money app version 4</div>
+    <button type="button" class="btn2 wide" id="checkUpd">Check for updates</button>
+    <div class="hint" id="appVer" style="text-align:center;margin-top:10px"></div>
   </section>
 
   <section id="viewAccountEdit" class="hide">

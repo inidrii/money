@@ -1,10 +1,11 @@
 /* Keeps the app's own files on the phone so it opens instantly and works offline.
  * Data is not cached here: the app stores it itself and syncs with the Google Sheet. */
-const VERSION = 'money-v4';
+const VERSION = 'money-v5';
 const FILES = ['./', 'index.html', 'app.js', 'jsQR.js', 'manifest.webmanifest', 'icon-180.png', 'icon-192.png', 'icon-512.png'];
 
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(VERSION).then(c => c.addAll(FILES)).then(() => self.skipWaiting()));
+  // cache:'reload' skips the browser's own cache, so a new version never stores old files
+  e.waitUntil(caches.open(VERSION).then(c => c.addAll(FILES.map(f => new Request(f, { cache: 'reload' })))).then(() => self.skipWaiting()));
 });
 
 self.addEventListener('activate', e => {
