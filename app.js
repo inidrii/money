@@ -150,24 +150,29 @@ async function sync() {
   }
 }
 
+// Status icon: ✓ synced · ↻ syncing · number = changes waiting · • offline · ! error · ⬆ update ready
 function status() {
   const b = $('sync');
   if (!cfg || !data) { b.classList.add('hide'); return; }
   b.classList.remove('hide');
   const n = outbox.length;
-  let cls = '', text = 'Synced';
-  if (syncing) { cls = 'syncing'; text = 'Syncing'; }
-  else if (!navigator.onLine) { cls = 'offline'; text = n ? 'Offline · ' + n : 'Offline'; }
-  else if (syncError) { cls = 'error'; text = 'Sync error'; }
-  else if (n) { cls = 'syncing'; text = n + ' waiting'; }
-  if (updateReady && !syncing) { cls = 'update'; text = 'Update ↻'; }     // a new app version is ready
+  let cls = '', icon = '✓', label = 'Synced';
+  if (syncing) { cls = 'syncing'; icon = '↻'; label = 'Syncing'; }
+  else if (!navigator.onLine) { cls = 'offline'; icon = n ? String(n) : '•'; label = n ? 'Offline · ' + n + ' waiting' : 'Offline'; }
+  else if (syncError) { cls = 'error'; icon = '!'; label = 'Sync error'; }
+  else if (n) { cls = 'waiting'; icon = String(n); label = n + ' waiting'; }
+  if (updateReady && !syncing) { cls = 'update'; icon = '⬆'; label = 'Update ready: tap to update'; }
   b.className = cls;
-  $('syncText').textContent = text;
+  $('syncText').textContent = icon;
+  b.setAttribute('aria-label', label); b.title = label;
 }
 $('sync').addEventListener('click', () => {
   if (updateReady) return applyUpdate();
   if (syncError) toast(syncError, true);
   else if (!navigator.onLine) toast(outbox.length ? 'Offline. ' + outbox.length + ' change(s) will sync when you are back online.' : 'Offline. Everything is saved on this phone.');
+  else if (syncing) toast('Syncing with the sheet…');
+  else if (outbox.length) toast(outbox.length + ' change(s) waiting to sync. Syncing now…');
+  else toast('Synced' + (lastSync ? ' at ' + new Date(lastSync).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : '') + '.', 'ok');
   sync();
 });
 window.addEventListener('online', () => { status(); sync(); });
@@ -1109,9 +1114,9 @@ window.addEventListener('hashchange', () => {
 /* ---------- App updates ----------
  * The app keeps its files on the phone (that's what makes it open offline). New versions are
  * fetched in the background; when one is ready the status pill turns into "Update ↻". */
-const APP_VERSION = 20;
+const APP_VERSION = 21;
 let swReg = null, updateReady = false;
-function showUpdate() { if (!updateReady) { updateReady = true; status(); toast('A new version of Money is ready. Tap "Update" at the top.', 'info'); } }
+function showUpdate() { if (!updateReady) { updateReady = true; status(); toast('A new version of Money is ready. Tap ⬆ at the top right to update.', 'info'); } }
 function applyUpdate() {
   if (outbox.length && navigator.onLine) toast('Updating…');
   location.reload();

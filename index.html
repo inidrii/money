@@ -38,7 +38,7 @@
             width:100vw; margin-left:calc(50% - 50vw); margin-right:calc(50% - 50vw);
             padding:calc(var(--top) + 12px) max(16px, calc(50vw - 260px)) 12px;
             box-shadow:0 2px 8px rgba(20,48,77,.25); }
-    .head h1 { margin:0; font-size:21px; font-weight:700; padding-right:110px; }
+    .head h1 { margin:0; font-size:21px; font-weight:700; padding-right:44px; }
     .head + * { margin-top:14px; }
     .head .back, .head .switch button { background:rgba(255,255,255,.14); border:1px solid rgba(255,255,255,.28); color:#fff;
             border-radius:10px; min-height:40px; font-size:15px; font-weight:600; padding:0 14px; cursor:pointer; }
@@ -48,25 +48,27 @@
     .switch button { min-width:44px; font-size:22px !important; padding:0 !important; }
     .switch button:disabled { opacity:.35; }
 
-    /* Sync status pill, top right */
-    #sync { position:fixed; z-index:6; top:calc(var(--top) + 14px); right:max(12px, calc(50vw - 256px));
-            border:0; border-radius:14px; padding:5px 10px; font-size:12px; font-weight:700; cursor:pointer;
-            background:rgba(255,255,255,.16); color:#fff; display:flex; align-items:center; gap:6px; }
-    #sync .dot { width:8px; height:8px; border-radius:50%; background:#4ade80; }
-    #sync.syncing .dot { background:var(--amber); animation:pulse 1s infinite; }
-    #sync.offline .dot { background:#cbd5e1; }
-    #sync.error .dot { background:#f87171; }
+    /* Sync status: a round icon at the top right (tap it to see what it means) */
+    #sync { position:fixed; z-index:6; top:calc(var(--top) + 13px); right:max(14px, calc(50vw - 246px));
+            width:32px; height:32px; border:0; border-radius:50%; padding:0; cursor:pointer;
+            display:flex; align-items:center; justify-content:center; font-size:16px; font-weight:800; line-height:1;
+            background:rgba(255,255,255,.16); color:#4ade80; }
+    #sync .dot { display:none; }
+    #sync.syncing { color:var(--amber); }
+    #sync.syncing #syncText { display:inline-block; animation:spin 1s linear infinite; }
+    #sync.waiting { background:var(--amber); color:var(--navy); font-size:13px; }
+    #sync.offline { color:#cbd5e1; font-size:13px; }
+    #sync.error { background:#f87171; color:#fff; }
     #sync.update { background:var(--amber); color:var(--navy); }
-    #sync.update .dot { display:none; }
-    @keyframes pulse { 50% { opacity:.3; } }
 
-    /* Title · compact switch · (sync pill) on one line, for Add and Month */
-    .headRow { display:flex; align-items:center; gap:8px; margin-right:100px; min-height:34px; }
-    .headRow h1 { flex:none; padding-right:0; font-size:20px; }
-    .headRow .tabs, .headRow .switch { flex:1; min-width:0; margin-top:0; padding:3px; gap:3px; border-radius:10px; }
-    .headRow .tabs button { padding:5px 2px; font-size:13px; border-radius:7px; }
+    /* Header line: title on the left · switch centred on the screen · status icon on the right */
+    .head > h1 { line-height:34px; }
+    .headRow { display:grid; grid-template-columns:1fr auto 1fr; align-items:center; column-gap:8px; min-height:34px; }
+    .headRow h1 { justify-self:start; padding-right:0; font-size:20px; line-height:34px; white-space:nowrap; }
+    .headRow .tabs, .headRow .switch { grid-column:2; margin-top:0; padding:3px; gap:3px; border-radius:10px; }
+    .headRow .tabs button { flex:none; padding:5px 9px; font-size:13px; border-radius:7px; }
     .headRow .switch button { min-width:30px; min-height:28px; font-size:17px !important; border-radius:7px; }
-    .headRow .switchTitle { font-size:14px; white-space:nowrap; }
+    .headRow .switchTitle { min-width:84px; font-size:14px; white-space:nowrap; }
 
     /* Type tabs (Expense / Income / Transfer) */
     .tabs { display:flex; background:rgba(255,255,255,.14); border-radius:12px; padding:4px; gap:4px; margin-top:10px; }
