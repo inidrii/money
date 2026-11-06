@@ -41,8 +41,8 @@
     .head .back, .head .switch button { background:rgba(255,255,255,.14); border:1px solid rgba(255,255,255,.28); color:#fff;
             border-radius:10px; min-height:40px; font-size:15px; font-weight:600; padding:0 14px; cursor:pointer; }
     .head .back { margin-bottom:8px; }
-    .switch { display:flex; align-items:center; gap:8px; padding-right:96px; }
-    .switch h1 { flex:1; text-align:center; padding-right:0; }
+    .switch { display:flex; align-items:center; gap:8px; margin-top:10px; background:rgba(255,255,255,.10); border-radius:12px; padding:4px; }
+    .switchTitle { flex:1; text-align:center; font-size:17px; font-weight:700; color:#fff; }
     .switch button { min-width:44px; font-size:22px !important; padding:0 !important; }
     .switch button:disabled { opacity:.35; }
 
@@ -291,9 +291,10 @@
 
   <section id="viewMonth" class="hide">
     <div class="head">
+      <h1>Month</h1>
       <div class="switch">
         <button type="button" id="mPrev" aria-label="Previous month">‹</button>
-        <h1 id="mTitle">Month</h1>
+        <div id="mTitle" class="switchTitle">Month</div>
         <button type="button" id="mNext" aria-label="Next month">›</button>
       </div>
     </div>
