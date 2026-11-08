@@ -277,34 +277,51 @@ function entries() {
   return [...map.values()];
 }
 function S() { return data.setup; }
+function isPeriod(e) { return e.type === 'Adjustment' && e.description === 'New period' && !(Number(e.amount)); }
 function account(name) { return S().accounts.find(a => a.name === name); }
 function currencyOf(name) { const a = account(name); return a ? a.currency : ''; }
 
 /** Balances, totals, categories and people for one month (same rules as the sheet). */
 function overview(key) {
   const accs = {};
-  S().accounts.forEach(a => { accs[a.name] = Object.assign({}, a, { open: a.opening, income: 0, expense: 0, out: 0, in: 0, adj: 0 }); });
-  const month = [];
-  entries().forEach((e, i) => {
+  // earned/spent/gain: everything up to this month (investment results are counted over their whole life)
+  S().accounts.forEach(a => { accs[a.name] = Object.assign({}, a, { open: a.opening, income: 0, expense: 0, out: 0, in: 0, adj: 0, earned: 0, spent: 0, gain: 0, movedIn: 0, movedOut: 0, since: '' }); });
+  const month = [], all = entries();
+  // Investment results count from the latest "New period" marker (from its date on)
+  all.forEach(e => {
+    if (!isPeriod(e) || !(keyOf(e) <= key) || !accs[e.account]) return;
+    if (!accs[e.account].since || e.date > accs[e.account].since) accs[e.account].since = e.date;
+  });
+  all.forEach((e, i) => {
     const k = keyOf(e);
     if (!(k <= key)) return;
+    const inPeriod = acc => acc && (!acc.since || (e.date || '') >= acc.since);
     const now = k === key;
     if (now) month.push(Object.assign({ _i: i }, e));
     const amt = Number(e.amount) || 0, A = accs[e.account], T = accs[e.toAccount];
     const add = (acc, field, v) => { if (!acc) return; if (now) acc[field] += v; else acc.open += (field === 'expense' || field === 'out' ? -v : v); };
-    if (e.type === 'Income') add(A, 'income', amt);
-    else if (e.type === 'Expense') add(A, 'expense', amt);
-    else if (e.type === 'Adjustment') add(A, 'adj', amt);
-    else if (e.type === 'Transfer') { add(A, 'out', amt); add(T, 'in', e.received != null && e.received > 0 ? Number(e.received) : amt); }
+    const rcv = e.received != null && e.received > 0 ? Number(e.received) : amt;
+    if (e.type === 'Income') { add(A, 'income', amt); if (inPeriod(A)) A.earned += amt; }
+    else if (e.type === 'Expense') { add(A, 'expense', amt); if (inPeriod(A)) A.spent += amt; }
+    else if (e.type === 'Adjustment') { add(A, 'adj', amt); if (inPeriod(A)) A.gain += amt; }
+    else if (e.type === 'Transfer') {
+      add(A, 'out', amt); add(T, 'in', rcv);
+      if (inPeriod(A)) A.movedOut += amt;
+      if (inPeriod(T)) T.movedIn += rcv;
+    }
   });
   const accounts = S().accounts.map(a => {
     const x = accs[a.name];
     x.closing = r2(x.open + x.income - x.expense - x.out + x.in + x.adj);
+    x.result = r2(x.earned - x.spent + x.gain);
     return x;
   });
   const totals = {}, cats = {}, who = {};
+  const isInv = name => { const a = account(name); return !!a && a.type === 'Investment'; };
   month.forEach(e => {
     if (e.type !== 'Income' && e.type !== 'Expense') return;
+    if (isInv(e.account)) return; // investment costs and sales are shown in their own section
+
     const c = currencyOf(e.account) || 'ALL', amt = Number(e.amount) || 0;
     totals[c] = totals[c] || { income: 0, expense: 0 };
     totals[c][e.type === 'Income' ? 'income' : 'expense'] += amt;
@@ -614,7 +631,7 @@ function formEntry() {
 }
 // Returns [message, field] for the first problem, or null.
 function checkEntry(e) {
-  const okAmt = e.type === 'Adjustment' ? (!isNaN(e.amount) && e.amount !== 0) : e.amount > 0;
+  const okAmt = e.type === 'Adjustment' ? (!isNaN(e.amount) && (e.amount !== 0 || e.description === 'New period')) : e.amount > 0;
   if (!okAmt) return ['Enter an amount.', 'amount'];
   if (!e.date) return ['Choose a date.', 'date'];
   if (e.type === 'Transfer') {
@@ -715,9 +732,9 @@ let openAccName = null;
 function renderAccounts() {
   const o = overview(currentKey());
   $('accSub').textContent = 'Balances with everything entered up to ' + o.tab + '.';
-  const tot = {}, loans = {};
+  const tot = {}, loans = {}, inv = {};
   o.accounts.forEach(a => {
-    const box = a.type === 'Loan' ? loans : tot;
+    const box = a.type === 'Loan' ? loans : a.type === 'Investment' ? inv : tot;
     box[a.currency] = (box[a.currency] || 0) + a.closing;
     if (!(a.currency in tot)) tot[a.currency] = 0;
   });
@@ -732,11 +749,13 @@ function renderAccounts() {
   curOrder(Object.keys(tot)).forEach(c => t.appendChild(card('Total ' + c, tot[c], c)));
   const l = $('accTotalsLoans'); l.innerHTML = '';
   curOrder(Object.keys(loans)).forEach(c => l.appendChild(card(c + ' including loans', tot[c] + loans[c], c, 'Loans: ' + money(loans[c], c))));
+  curOrder(Object.keys(inv)).forEach(c => l.appendChild(card(c + ' including investments', tot[c] + inv[c], c, 'Money in investments: ' + money(inv[c], c))));
 
   const order = S().owners;
-  const group = a => a.type === 'Loan' ? 'Loans' : (a.owner || 'Other');
+  const group = a => a.type === 'Loan' ? 'Loans' : a.type === 'Investment' ? 'Investments' : (a.owner || 'Other');
+  const last = g => g === 'Investments' ? 1 : g === 'Loans' ? 2 : 0;
   const groups = [...new Set(o.accounts.map(group))]
-    .sort((a, b) => (a === 'Loans') - (b === 'Loans') || (order.indexOf(a) + 1 || 99) - (order.indexOf(b) + 1 || 99));
+    .sort((a, b) => last(a) - last(b) || (order.indexOf(a) + 1 || 99) - (order.indexOf(b) + 1 || 99));
   const g = $('accGroups'); g.innerHTML = '';
   groups.forEach(name => {
     g.appendChild(el('h2', null, name));
@@ -744,9 +763,18 @@ function renderAccounts() {
       const b = el('button', 'row'); b.type = 'button';
       const left = el('div', 'l');
       left.appendChild(el('div', 'name', a.name));
-      left.appendChild(el('div', 'sub', 'This month: ' + money(a.income + a.in, '', true) + ' in · ' + money(-(a.expense + a.out), '', true) + ' out'));
       const right = el('div', 'r');
-      right.appendChild(el('span', 'amt' + (a.closing < 0 ? ' neg' : ''), money(a.closing, a.currency)));
+      if (a.type === 'Investment') {
+        // Right: current balance (like any account). Underneath: totals of the whole period, and the result.
+        left.appendChild(el('div', 'sub', periodLabel(a) + ': earned ' + fmt(a.earned) + ' · spent ' + fmt(a.spent)));
+        const res = el('div', 'sub'); res.appendChild(document.createTextNode('Result '));
+        res.appendChild(el('b', a.result < 0 ? 'neg' : 'pos', money(a.result, a.currency, true)));
+        left.appendChild(res);
+        right.appendChild(el('span', 'amt' + (a.closing < 0 ? ' neg' : ''), money(a.closing, a.currency)));
+      } else {
+        left.appendChild(el('div', 'sub', 'This month: ' + money(a.income + a.in, '', true) + ' in · ' + money(-(a.expense + a.out), '', true) + ' out'));
+        right.appendChild(el('span', 'amt' + (a.closing < 0 ? ' neg' : ''), money(a.closing, a.currency)));
+      }
       right.appendChild(el('span', 'chev', '›'));
       b.appendChild(left); b.appendChild(right);
       b.addEventListener('click', () => openAccount(a.name));
@@ -754,6 +782,7 @@ function renderAccounts() {
     });
   });
 }
+function periodLabel(a) { return a.since ? 'Since ' + shortDate(a.since) + ' ' + a.since.slice(0, 4) : 'In total'; }
 function openAccount(name) { openAccName = name; showView('Account'); }
 function renderAccount() {
   const o = overview(currentKey());
@@ -764,11 +793,25 @@ function renderAccount() {
   $('adBalance').className = 'bigNum' + (a.closing < 0 ? ' neg' : '');
   $('adLine').textContent = 'Start of ' + o.tab + ': ' + money(a.open, a.currency) + ' · in ' + fmt(a.income + a.in) +
     ' · out ' + fmt(a.expense + a.out) + (a.adj ? ' · corrections ' + money(a.adj, '', true) : '');
+  const isInvAcc = a.type === 'Investment';
+  $('adPeriod').classList.toggle('hide', !isInvAcc);
+  if (!isInvAcc) $('adPeriodBox').classList.add('hide');
+  const inv = $('adInv'); inv.innerHTML = ''; inv.classList.toggle('hide', !isInvAcc);
+  if (isInvAcc) {
+    inv.appendChild(el('div', 'label', periodLabel(a) + (a.since ? '' : ' (up to ' + o.tab + ')')));
+    [['Earned (sales)', a.earned, 'pos'], ['Spent (costs)', -a.spent, 'neg'], a.gain ? ['Value change', a.gain, a.gain < 0 ? 'neg' : 'pos'] : null,
+     ['Moved in from other accounts', a.movedIn, null], ['Moved out to other accounts', -a.movedOut, null]].filter(Boolean).forEach(([k, n, cls]) => {
+      const kv = el('div', 'kv'); kv.appendChild(el('span', null, k)); kv.appendChild(el('span', n ? cls : null, money(n, '', true))); inv.appendChild(kv);
+    });
+    const kv = el('div', 'kv'); kv.appendChild(el('span', null, 'Result (earned − spent)'));
+    kv.appendChild(el('b', a.result < 0 ? 'neg' : 'pos', money(a.result, a.currency, true))); inv.appendChild(kv);
+  }
   $('adListTitle').textContent = 'Transactions in ' + o.tab;
   const txs = o.entries.filter(t => t.account === a.name || t.toAccount === a.name);
   renderTxList($('adList'), txs.map(t => {
     let amt, title = t.description || t.category || t.type, sub;
-    if (t.type === 'Adjustment') { amt = t.amount; title = 'Balance correction'; sub = t.who; }
+    if (isPeriod(t)) { amt = 0; title = 'New period started'; sub = t.who; }
+    else if (t.type === 'Adjustment') { amt = t.amount; title = 'Balance correction'; sub = t.who; }
     else if (t.type === 'Income') { amt = t.amount; sub = t.description ? t.category : ''; }
     else if (t.type === 'Expense') { amt = -t.amount; sub = t.description ? t.category : ''; }
     else if (t.account === a.name) { amt = -t.amount; sub = 'Transfer to ' + t.toAccount; if (!t.description) title = 'Transfer'; }
@@ -777,6 +820,23 @@ function renderAccount() {
   }), 'Account');
 }
 $('accBack').addEventListener('click', () => showView('Accounts'));
+
+/* Investments: start a new period (e.g. each year). Saved as a 0 "New period" marker, so both phones see it. */
+$('adPeriod').addEventListener('click', () => {
+  const box = $('adPeriodBox');
+  box.classList.toggle('hide');
+  if (!box.classList.contains('hide')) $('adPeriodDate').value = today().slice(0, 4) + '-01-01';
+});
+$('adPeriodSave').addEventListener('click', () => {
+  const d = $('adPeriodDate').value;
+  if (!d) return toast('Choose the date the new period starts.', true);
+  queue({ op: 'add', id: rid(), entry: { type: 'Adjustment', date: d, account: openAccName, amount: 0,
+                                          description: 'New period', who: S().me || '' } });
+  $('adPeriodBox').classList.add('hide');
+  if (keyOfDate(d) > currentKey()) toast('New period saved. It shows from ' + shortDate(d) + ' ' + d.slice(0, 4) + '.', 'ok');
+  else toast('New period started from ' + shortDate(d) + ' ' + d.slice(0, 4) + '.', 'ok');
+  renderAccount();
+});
 
 /* Correct balance */
 function fixDiff() {
@@ -901,6 +961,21 @@ function renderMonth() {
     });
   });
 
+  // Investments: this month's sales and costs per project, plus the result of its current period
+  const invs = o.accounts.filter(a => a.type === 'Investment' && (a.income || a.expense || a.earned || a.spent));
+  $('mInvBlock').classList.toggle('hide', !invs.length);
+  const mi = $('mInv'); mi.innerHTML = '';
+  invs.forEach(a => {
+    const card = el('div', 'card');
+    card.appendChild(el('div', 'label', a.name));
+    [['Earned this month', a.income, 'pos'], ['Spent this month', -a.expense, 'neg']].forEach(([k, n, cls]) => {
+      const kv = el('div', 'kv'); kv.appendChild(el('span', null, k)); kv.appendChild(el('span', n ? cls : null, money(n, a.currency, true))); card.appendChild(kv);
+    });
+    const kv = el('div', 'kv'); kv.appendChild(el('span', null, 'Result ' + (a.since ? 'since ' + shortDate(a.since) + ' ' + a.since.slice(0, 4) : 'in total')));
+    kv.appendChild(el('b', a.result < 0 ? 'neg' : 'pos', money(a.result, a.currency, true))); card.appendChild(kv);
+    mi.appendChild(card);
+  });
+
   const present = sortWho([...new Set(o.entries.map(e => e.who || 'Not set'))]);
   const choices = ['All'].concat(people, present.filter(x => !people.includes(x)));
   if (!choices.includes(whoFilter)) whoFilter = 'All';
@@ -913,7 +988,7 @@ function renderMonth() {
   const shown = o.entries.filter(e => whoFilter === 'All' || (e.who || 'Not set') === whoFilter);
   renderTxList($('mList'), shown.map(x => {
     const cur = currencyOf(x.account);
-    if (x.type === 'Adjustment') return { src: x, date: x.date, type: x.type, cur: cur, amt: x.amount, signed: true, title: 'Balance correction', sub: x.account };
+    if (x.type === 'Adjustment') return { src: x, date: x.date, type: x.type, cur: cur, amt: x.amount, signed: true, title: isPeriod(x) ? 'New period started' : 'Balance correction', sub: x.account };
     if (x.type === 'Transfer') {
       const toCur = currencyOf(x.toAccount), fx = toCur && toCur !== cur && x.received != null && x.received > 0;
       return { src: x, date: x.date, type: x.type, cur: cur, amt: x.amount, signed: false, title: x.description || 'Transfer',
@@ -1125,7 +1200,7 @@ window.addEventListener('hashchange', () => {
 /* ---------- App updates ----------
  * The app keeps its files on the phone (that's what makes it open offline). New versions are
  * fetched in the background; when one is ready the status pill turns into "Update ↻". */
-const APP_VERSION = 22;
+const APP_VERSION = 23;
 let swReg = null, updateReady = false;
 function showUpdate() { if (!updateReady) { updateReady = true; status(); toast('A new version of Money is ready. Tap ⬆ at the top right to update.', 'info'); } }
 function applyUpdate() {

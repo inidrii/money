@@ -289,7 +289,15 @@
       <div class="bigNum" id="adBalance"></div>
       <div class="sub" id="adLine"></div>
     </div>
+    <div class="card hide" id="adInv"></div>
     <button type="button" class="btn2 wide" id="adFix">Correct balance</button>
+    <button type="button" class="btn2 wide hide" id="adPeriod" style="margin-top:8px">Start a new period</button>
+    <div class="card hide" id="adPeriodBox" style="margin-top:10px">
+      <div class="sub">Earned, spent and result start again from 0 on this date (e.g. 1 January). The money in the account and the old entries stay as they are.</div>
+      <label for="adPeriodDate">New period starts on</label>
+      <input id="adPeriodDate" type="date">
+      <button type="button" class="save" id="adPeriodSave" style="background:var(--blue)">Start new period</button>
+    </div>
     <div class="card hide" id="adFixBox" style="margin-top:10px">
       <div class="sub">Type what the bank or wallet really shows. The difference is saved as a balance correction (not counted as income or expense).</div>
       <label for="adActual">Actual balance</label>
@@ -322,6 +330,11 @@
     <div id="mCats"></div>
     <h2>By person</h2>
     <div id="mWho"></div>
+    <div id="mInvBlock" class="hide">
+      <h2>Investments</h2>
+      <div class="sub">Not counted in the household income and expenses above.</div>
+      <div id="mInv"></div>
+    </div>
     <h2>Transactions</h2>
     <div class="filter" id="mFilter"></div>
     <div class="list" id="mList"></div>
