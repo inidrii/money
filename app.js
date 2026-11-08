@@ -414,13 +414,32 @@ function setMode(m) {
   $('msg').className = 'msg';
 }
 
+/* Bank of Albania official rates (lek per 1 unit), read by the Google script. */
+function rate(cur) { if (cur === 'ALL') return 1; const r = S().rates; return r && r[cur] > 0 ? r[cur] : null; }
+function convert(amt, from, to) { const a = rate(from), b = rate(to); return a && b ? r2(amt * a / b) : null; }
+function rateText(cur) { return '1 ' + cur + ' = ' + rate(cur).toLocaleString('en-US', { maximumFractionDigits: 4 }) + ' ALL'; }
+
+let receivedEdited = false;
 function updateCurrency() {
   $('cur').textContent = currencyOf($('account').value);
   const to = currencyOf($('toAccount').value);
   $('cur2').textContent = to;
   const fx = mode === 'Transfer' && $('toAccount').value && to && to !== $('cur').textContent;
   $('receivedBlock').classList.toggle('hide', !fx);
+  if (fx) prefillReceived();
   whoDefault();
+}
+// Transfers between currencies: suggest the amount received at the official rate (can be changed by hand)
+function prefillReceived() {
+  const from = $('cur').textContent, to = $('cur2').textContent;
+  const r = S().rates, hint = $('recHint');
+  const v = convert(num($('amount').value), from, to);
+  const known = rate(from) && rate(to);
+  hint.textContent = known
+    ? 'Bank of Albania' + (r.date ? ' (' + r.date + ')' : '') + ': ' + [from, to].filter(c => c !== 'ALL').map(rateText).join(' · ') + '. Change it if the bank used another rate.'
+    : 'No official rate for ' + (rate(from) ? to : from) + ': enter what arrived in the "To" account.';
+  if (receivedEdited || !known) return;
+  $('received').value = v != null && !isNaN(v) && v > 0 ? v.toFixed(2) : '';
 }
 // Who = the person using this phone (from the connection code); can be changed by hand.
 function whoDefault() {
@@ -431,7 +450,7 @@ function whoDefault() {
   if (a && has(a.owner)) $('who').value = a.owner;
 }
 function resetForm() {
-  invoice = blankInvoice(); amountEdited = false; whoEdited = false;
+  invoice = blankInvoice(); amountEdited = false; whoEdited = false; receivedEdited = false;
   ['amount', 'received', 'description', 'link'].forEach(id => { $(id).value = ''; });
   $('category').value = '';
   $('info').textContent = ''; $('amountHint').textContent = '';
@@ -446,7 +465,8 @@ document.querySelectorAll('#tabs button').forEach(b => b.addEventListener('click
 }));
 $('account').addEventListener('change', () => { updateCurrency(); applyInvoiceAmount(); });
 $('toAccount').addEventListener('change', updateCurrency);
-$('amount').addEventListener('input', () => { amountEdited = true; });
+$('amount').addEventListener('input', () => { amountEdited = true; if (!$('receivedBlock').classList.contains('hide')) prefillReceived(); });
+$('received').addEventListener('input', () => { receivedEdited = $('received').value.trim() !== ''; });
 $('who').addEventListener('change', () => { whoEdited = true; });
 $('amtSign').addEventListener('click', () => { const v = $('amount').value.trim(); $('amount').value = v.startsWith('-') ? v.slice(1) : '-' + v; });
 
@@ -678,6 +698,7 @@ function startEdit(t, back) {
   $('toAccount').value = t.toAccount || '';
   $('amount').value = Number(t.amount).toFixed(2);
   $('received').value = t.received != null ? Number(t.received).toFixed(2) : '';
+  receivedEdited = t.received != null && t.received > 0;   // keep the saved amount when editing
   $('date').value = t.date || today();
   if (MODES[t.type].cats) $('category').value = t.category;
   $('description').value = t.description || '';
@@ -747,6 +768,18 @@ function renderAccounts() {
   };
   const t = $('accTotals'); t.innerHTML = '';
   curOrder(Object.keys(tot)).forEach(c => t.appendChild(card('Total ' + c, tot[c], c)));
+  // Everything (without loans and investments) in ALL at the Bank of Albania rate
+  const curs = curOrder(Object.keys(tot)).filter(c => tot[c]);
+  if (curs.some(c => c !== 'ALL')) {
+    const used = curs.filter(c => rate(c)), missing = curs.filter(c => !rate(c));
+    const sum = r2(used.reduce((s, c) => s + tot[c] * rate(c), 0));
+    const r = S().rates || {};
+    const note = used.filter(c => c !== 'ALL').map(rateText).join(' · ') + (r.date ? ' (Bank of Albania, ' + r.date + ')' : '') +
+                 (missing.length ? '. Not included: ' + missing.join(', ') + ' (no rate yet)' : '');
+    const c = card('All together in ALL', sum, 'ALL', note);
+    c.style.gridColumn = '1 / -1';
+    t.appendChild(c);
+  }
   const l = $('accTotalsLoans'); l.innerHTML = '';
   curOrder(Object.keys(loans)).forEach(c => l.appendChild(card(c + ' including loans', tot[c] + loans[c], c, 'Loans: ' + money(loans[c], c))));
 
@@ -1199,7 +1232,7 @@ window.addEventListener('hashchange', () => {
 /* ---------- App updates ----------
  * The app keeps its files on the phone (that's what makes it open offline). New versions are
  * fetched in the background; when one is ready the status pill turns into "Update ↻". */
-const APP_VERSION = 24;
+const APP_VERSION = 25;
 let swReg = null, updateReady = false;
 function showUpdate() { if (!updateReady) { updateReady = true; status(); toast('A new version of Money is ready. Tap ⬆ at the top right to update.', 'info'); } }
 function applyUpdate() {
