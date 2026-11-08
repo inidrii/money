@@ -749,7 +749,6 @@ function renderAccounts() {
   curOrder(Object.keys(tot)).forEach(c => t.appendChild(card('Total ' + c, tot[c], c)));
   const l = $('accTotalsLoans'); l.innerHTML = '';
   curOrder(Object.keys(loans)).forEach(c => l.appendChild(card(c + ' including loans', tot[c] + loans[c], c, 'Loans: ' + money(loans[c], c))));
-  curOrder(Object.keys(inv)).forEach(c => l.appendChild(card(c + ' including investments', tot[c] + inv[c], c, 'Money in investments: ' + money(inv[c], c))));
 
   const order = S().owners;
   const group = a => a.type === 'Loan' ? 'Loans' : a.type === 'Investment' ? 'Investments' : (a.owner || 'Other');
@@ -1200,7 +1199,7 @@ window.addEventListener('hashchange', () => {
 /* ---------- App updates ----------
  * The app keeps its files on the phone (that's what makes it open offline). New versions are
  * fetched in the background; when one is ready the status pill turns into "Update ↻". */
-const APP_VERSION = 23;
+const APP_VERSION = 24;
 let swReg = null, updateReady = false;
 function showUpdate() { if (!updateReady) { updateReady = true; status(); toast('A new version of Money is ready. Tap ⬆ at the top right to update.', 'info'); } }
 function applyUpdate() {
